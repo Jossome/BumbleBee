@@ -27,7 +27,7 @@ if __name__ == "__main__":
     model_dir = args.model_dir
 
     print("Loading dataset")
-    train_dataset = BlockFrameFlowDataset(dataset_dir, "train")
+    # train_dataset = BlockFrameFlowDataset(dataset_dir, "train")
     video_frames = pickle.load(open("data/test.p", "rb"))
     video_flows = pickle.load(open("data/test_flow.p", "rb"))
 
@@ -75,9 +75,9 @@ if __name__ == "__main__":
                     current_block_flow_y,
                     dtype=np.float32).reshape((1, 14, 30, 40))
 
-                current_block_frame -= train_dataset.mean["frames"]
-                current_block_flow_x -= train_dataset.mean["flow_x"]
-                current_block_flow_y -= train_dataset.mean["flow_y"]
+                # current_block_frame -= train_dataset.mean["frames"]
+                # current_block_flow_x -= train_dataset.mean["flow_x"]
+                # current_block_flow_y -= train_dataset.mean["flow_y"]
 
                 tensor_frames = torch.from_numpy(current_block_frame)
                 tensor_flow_x = torch.from_numpy(current_block_flow_x)
