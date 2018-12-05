@@ -78,41 +78,49 @@ print("Loading trained model")
 net = torch.load("trained.model")
 net.cuda()
 
-'''
-CURRENT STEP
-'''
-
 print('==> Preparing data..')
 normalize = transforms.Normalize(mean=net.mean,
                                  std=net.std)
 idx = np.arange(50000)
 np.random.shuffle(idx)
+
+video_frames = pickle.load(open("data/test.p", "rb"))
+video_flows = pickle.load(open("data/test_flow.p", "rb"))
+
 training_idx = idx[:train_size]
 test_idx = idx[train_size:test_size]
 
-train_loader = torch.utils.data.DataLoader(
-    dset.ImageFolder('./imagenetdata/val', transforms.Compose([
-        transforms.Scale(round(max(net.input_size) * 1.050)),
-        transforms.CenterCrop(max(net.input_size)),
-        transforms.ToTensor(),
-        ToSpaceBGR(net.input_space == 'BGR'),
-        ToRange255(max(net.input_range) == 255),
-        normalize,
-    ])),
-    batch_size=1, shuffle=False, sampler=SubsetRandomSampler(training_idx),
-    num_workers=opt.workers, pin_memory=True)
+'''
+CURRENT STEP
+'''
+print(video_frames.shape)
+print(video_flows.shape)
 
-test_loader = torch.utils.data.DataLoader(
-    dset.ImageFolder('./imagenetdata/val', transforms.Compose([
-        transforms.Scale(round(max(net.input_size) * 1.050)),
-        transforms.CenterCrop(max(net.input_size)),
-        transforms.ToTensor(),
-        ToSpaceBGR(net.input_space == 'BGR'),
-        ToRange255(max(net.input_range) == 255),
-        normalize,
-    ])),
-    batch_size=1, shuffle=False, sampler=SubsetRandomSampler(test_idx),
-    num_workers=opt.workers, pin_memory=True)
+caonima
+
+# train_loader = torch.utils.data.DataLoader(
+#     dset.ImageFolder('./imagenetdata/val', transforms.Compose([
+#         transforms.Scale(round(max(net.input_size) * 1.050)),
+#         transforms.CenterCrop(max(net.input_size)),
+#         transforms.ToTensor(),
+#         ToSpaceBGR(net.input_space == 'BGR'),
+#         ToRange255(max(net.input_range) == 255),
+#         normalize,
+#     ])),
+#     batch_size=1, shuffle=False, sampler=SubsetRandomSampler(training_idx),
+#     num_workers=opt.workers, pin_memory=True)
+
+# test_loader = torch.utils.data.DataLoader(
+#     dset.ImageFolder('./imagenetdata/val', transforms.Compose([
+#         transforms.Scale(round(max(net.input_size) * 1.050)),
+#         transforms.CenterCrop(max(net.input_size)),
+#         transforms.ToTensor(),
+#         ToSpaceBGR(net.input_space == 'BGR'),
+#         ToRange255(max(net.input_range) == 255),
+#         normalize,
+#     ])),
+#     batch_size=1, shuffle=False, sampler=SubsetRandomSampler(test_idx),
+#     num_workers=opt.workers, pin_memory=True)
 
 min_in, max_in = net.input_range[0], net.input_range[1]
 min_in, max_in = np.array([min_in, min_in, min_in]), np.array([max_in, max_in, max_in])
