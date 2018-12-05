@@ -23,6 +23,7 @@ TRAIN_PEOPLE_ID = [11, 12, 13, 14, 15, 16, 17, 18]
 DEV_PEOPLE_ID = [19, 20, 21, 23, 24, 25, 1, 4]
 TEST_PEOPLE_ID = [22, 2, 3, 5, 6, 7, 8, 9, 10]
 
+
 def make_raw_dataset(dataset="train"):
     if dataset == "train":
         ID = TRAIN_PEOPLE_ID
@@ -79,6 +80,7 @@ def make_raw_dataset(dataset="train"):
             })
 
     pickle.dump(data, open("data/%s.p" % dataset, "wb"))
+
 
 def make_optflow_dataset(dataset="train"):
     if dataset == "train":
@@ -144,8 +146,8 @@ def make_optflow_dataset(dataset="train"):
 
                     for r in range(30):
                         for c in range(40):
-                            subsampled_x[r, c] = flows[r*2, c*2, 0]
-                            subsampled_y[r, c] = flows[r*2, c*2, 1]
+                            subsampled_x[r, c] = flows[r * 2, c * 2, 0]
+                            subsampled_y[r, c] = flows[r * 2, c * 2, 1]
 
                     flow_x.append(subsampled_x)
                     flow_y.append(subsampled_y)
@@ -160,6 +162,7 @@ def make_optflow_dataset(dataset="train"):
             })
 
     pickle.dump(data, open("data/%s_flow.p" % dataset, "wb"))
+
 
 def parse_sequence_file():
     print("Parsing ./dataset/00sequences.txt")
@@ -202,6 +205,7 @@ def parse_sequence_file():
             current_filename = s + "_uncomp.avi"
 
     return frames_idx
+
 
 if __name__ == "__main__":
     print("Making raw train dataset")

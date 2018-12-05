@@ -14,20 +14,22 @@ CATEGORY_INDEX = {
     "walking": 5
 }
 
+
 class RawDataset(Dataset):
     def __init__(self, directory, dataset="train"):
         self.instances, self.labels = self.read_dataset(directory, dataset)
 
         self.instances = torch.from_numpy(self.instances)
         self.labels = torch.from_numpy(self.labels)
+        self.mean = 0
 
     def __len__(self):
         return self.instances.shape[0]
 
     def __getitem__(self, idx):
-        sample = { 
+        sample = {
             "instance": self.instances[idx],
-            "label": self.labels[idx] 
+            "label": self.labels[idx]
         }
 
         return sample
@@ -59,6 +61,7 @@ class RawDataset(Dataset):
 
         return instances, labels
 
+
 class BlockFrameDataset(Dataset):
     def __init__(self, directory, dataset="train"):
         self.instances, self.labels = self.read_dataset(directory, dataset)
@@ -70,9 +73,9 @@ class BlockFrameDataset(Dataset):
         return self.instances.shape[0]
 
     def __getitem__(self, idx):
-        sample = { 
-            "instance": self.instances[idx], 
-            "label": self.labels[idx] 
+        sample = {
+            "instance": self.instances[idx],
+            "label": self.labels[idx]
         }
 
         return sample
@@ -109,6 +112,7 @@ class BlockFrameDataset(Dataset):
 
         return instances, labels
 
+
 class BlockFrameFlowDataset(Dataset):
     def __init__(self, directory, dataset="train", mean=None):
         self.instances, self.labels = self.read_dataset(directory, dataset)
@@ -127,9 +131,9 @@ class BlockFrameFlowDataset(Dataset):
         return len(self.instances)
 
     def __getitem__(self, idx):
-        sample = { 
-            "instance": self.instances[idx], 
-            "label": self.labels[idx] 
+        sample = {
+            "instance": self.instances[idx],
+            "label": self.labels[idx]
         }
 
         return sample
@@ -218,4 +222,3 @@ class BlockFrameFlowDataset(Dataset):
         labels = np.array(labels, dtype=np.uint8)
 
         return instances, labels
-

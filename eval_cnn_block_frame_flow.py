@@ -18,9 +18,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--dataset_dir", type=str, default="data",
-        help="directory to dataset")
+                        help="directory to dataset")
     parser.add_argument("--model_dir", type=str, default="trained.model",
-        help="directory to model")
+                        help="directory to model")
     args = parser.parse_args()
 
     dataset_dir = args.dataset_dir
@@ -91,7 +91,7 @@ if __name__ == "__main__":
                               instance_flow_y).data[0].cpu().numpy()
 
                 score -= np.max(score)
-                p = np.e**score / np.sum(np.e**score)
+                p = np.e ** score / np.sum(np.e ** score)
                 P += p
 
                 current_block_frame = []
@@ -108,4 +108,3 @@ if __name__ == "__main__":
 
     print("%d/%d correct" % (correct, len(video_frames)))
     print("Accuracy: %.9f" % (correct / len(video_frames)))
-

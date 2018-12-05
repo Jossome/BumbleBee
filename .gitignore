@@ -6,9 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
-# Video dataset .avi
+# Other things
 *.avi
 *.model
+.idea/*
 
 # Distribution / packaging
 .Python
