@@ -2,6 +2,7 @@ import argparse
 import os
 import random
 import numpy as np
+import pickle
 
 import torch
 import torch.nn as nn
@@ -79,24 +80,20 @@ net = torch.load("trained.model")
 net.cuda()
 
 print('==> Preparing data..')
-normalize = transforms.Normalize(mean=net.mean,
-                                 std=net.std)
+# normalize = transforms.Normalize(mean=net.mean, std=net.std)
 idx = np.arange(50000)
 np.random.shuffle(idx)
 
-video_frames = pickle.load(open("data/test.p", "rb"))
-video_flows = pickle.load(open("data/test_flow.p", "rb"))
+# len == 192
+dev_frames = pickle.load(open("data/dev.p", "rb"))
+dev_flows = pickle.load(open("data/dev_flow.p", "rb"))
 
-training_idx = idx[:train_size]
-test_idx = idx[train_size:test_size]
+# len == 216
+test_frames = pickle.load(open("data/test.p", "rb"))
+test_flows = pickle.load(open("data/test_flow.p", "rb"))
 
-'''
-CURRENT STEP
-'''
-print(video_frames.shape)
-print(video_flows.shape)
-
-caonima
+# training_idx = idx[:train_size]
+# test_idx = idx[train_size:test_size]
 
 # train_loader = torch.utils.data.DataLoader(
 #     dset.ImageFolder('./imagenetdata/val', transforms.Compose([
@@ -128,6 +125,9 @@ mean, std = np.array(net.mean), np.array(net.std)
 min_out, max_out = np.min((min_in - mean) / std), np.max((max_in - mean) / std)
 
 
+'''
+CURRENT STEP
+'''
 def train(epoch, patch, patch_shape):
     net.eval()
     success = 0
