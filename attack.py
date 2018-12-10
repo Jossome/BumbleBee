@@ -43,7 +43,7 @@ parser.add_argument('--target', type=int, default=5, help='The target class: 859
 parser.add_argument('--conf_target', type=float, default=0.9,
                     help='Stop attack on image when target classifier reaches this value for target class')
 
-parser.add_argument('--max_count', type=int, default=100, help='max number of iterations to find adversarial example')
+parser.add_argument('--max_count', type=int, default=300, help='max number of iterations to find adversarial example')
 parser.add_argument('--patch_type', type=str, default='circle', help='patch type: circle or square')
 parser.add_argument('--patch_size', type=float, default=0.05, help='patch size. E.g. 0.05 ~= 5% of image ')
 
@@ -405,6 +405,7 @@ def train(patch):
             new_patch[i] = submatrix(patch[i])
 
         patch = new_patch
+        print(patch.shape)
 
         # log to file
         progress_bar(batch_idx, 192, "Train Patch Success: {:.3f}".format(success / total))
@@ -471,6 +472,7 @@ def attack(x, patch, mask):
     adv_frames, adv_flow_x, adv_flow_y = process_input(frames, patch=patch, mask=mask)
 
     count = 0
+    lr = 10000
 
     while conf_target > target_prob:
         count += 1
@@ -481,13 +483,15 @@ def attack(x, patch, mask):
         adv_out, grad_frames, grad_flow_x, grad_flow_y = forward(adv_x, grad=True, rescue=(True, False, False))
 
         # adv_out_probs, adv_out_labels = adv_out.max(1)
+        # if count > 150:
+        #     lr = 100000
 
         # TODO is optical flow differentiable and backpropagatable?
         # patch -= ((grad_frames + grad_flow_x + grad_flow_y) / 3)
         try:
-            patch -= grad_frames[0][0]
+            patch -= grad_frames[0][0] * lr
         except Exception as e:
-            patch[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0]
+            patch[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
 
         adv_frames, adv_flow_x, adv_flow_y = process_input(frames, patch=patch, mask=mask)
         adv_x = (adv_frames, adv_flow_x, adv_flow_y)
