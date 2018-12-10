@@ -98,8 +98,8 @@ def format_time(seconds):
 
 def submatrix(arr):
     x, y = np.nonzero(arr)
-    # Using the smallest and largest x and y indices of nonzero elements, 
-    # we can find the desired rectangular bounds.  
+    # Using the smallest and largest x and y indices of nonzero elements,
+    # we can find the desired rectangular bounds.
     # And don't forget to add 1 to the top bound to avoid the fencepost problem.
     return arr[x.min():x.max() + 1, y.min():y.max() + 1]
 
@@ -127,97 +127,77 @@ class ToRange255(object):
         return tensor
 
 
-def init_patch_circle(image_size, patch_size):
-    image_size = image_size ** 2
+def init_patch_circle(frame_height, frame_width, patch_size):
+    image_size = frame_height * frame_width
     noise_size = int(image_size * patch_size)
     radius = int(math.sqrt(noise_size / math.pi))
-    patch = np.zeros((1, 3, radius * 2, radius * 2))
-    for i in range(3):
-        a = np.zeros((radius * 2, radius * 2))
-        cx, cy = radius, radius  # The center of circle
-        y, x = np.ogrid[-radius: radius, -radius: radius]
-        index = x ** 2 + y ** 2 <= radius ** 2
-        a[cy - radius:cy + radius, cx - radius:cx + radius][index] = np.random.rand()
-        idx = np.flatnonzero((a == 0).all((1)))
-        a = np.delete(a, idx, axis=0)
-        patch[0][i] = np.delete(a, idx, axis=1)
-    return patch, patch.shape
+    # patch = np.zeros((1, 3, radius * 2, radius * 2))
+    # for i in range(3):
+    #     a = np.zeros((radius * 2, radius * 2))
+    #     cx, cy = radius, radius  # The center of circle
+    #     y, x = np.ogrid[-radius: radius, -radius: radius]
+    #     index = x ** 2 + y ** 2 <= radius ** 2
+    #     a[cy - radius:cy + radius, cx - radius:cx + radius][index] = np.random.rand()
+    #     idx = np.flatnonzero((a == 0).all((1)))
+    #     a = np.delete(a, idx, axis=0)
+    #     patch[0][i] = np.delete(a, idx, axis=1)
+
+    patch = np.zeros((1, radius * 2, radius * 2))
+    a = np.zeros((radius * 2, radius * 2))
+    cx, cy = radius, radius  # The center of circle
+    y, x = np.ogrid[-radius: radius, -radius: radius]
+    index = x ** 2 + y ** 2 <= radius ** 2
+    a[cy - radius:cy + radius, cx - radius:cx + radius][index] = np.random.rand()
+    idx = np.flatnonzero((a == 0).all((1)))
+    a = np.delete(a, idx, axis=0)
+    patch[0] = np.delete(a, idx, axis=1)
+    return patch
 
 
-def circle_transform(patch, data_shape, patch_shape, image_size):
-    # get dummy image 
-    x = np.zeros(data_shape)
+def circle_transform(patch, video_shape):
+    # get dummy image
+    v_len, frame_height, frame_width = video_shape
+    x = np.zeros(video_shape)
+    # x = np.zeros((v_len, 3, frame_height, frame_width))
 
     # get shape
+    patch_shape = patch.shape
     m_size = patch_shape[-1]
 
     for i in range(x.shape[0]):
+        # patch[0] because it has a static pattern.
+        # For dynamic pattern patch, change 0 to i.
 
         # random rotation
         rot = np.random.choice(360)
-        for j in range(patch[i].shape[0]):
-            patch[i][j] = rotate(patch[i][j], angle=rot, reshape=False)
+        # for j in range(patch[0].shape[0]):
+        #     patch[0][j] = rotate(patch[0][j], angle=rot, reshape=False)
+        patch[0] = rotate(patch[0], angle=rot, reshape=False)
 
-        # random location
-        random_x = np.random.choice(image_size)
-        if random_x + m_size > x.shape[-1]:
-            while random_x + m_size > x.shape[-1]:
-                random_x = np.random.choice(image_size)
-        random_y = np.random.choice(image_size)
-        if random_y + m_size > x.shape[-1]:
-            while random_y + m_size > x.shape[-1]:
-                random_y = np.random.choice(image_size)
+        # next time location
+        # cx, cy: upper-left corner, not center
+        ratio = i / v_len
+        cx = int(ratio * (frame_height - patch_shape[-1]))
+        cy = int(ratio * (frame_width - patch_shape[-1]))
 
-        # apply patch to dummy image  
-        x[i][0][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][0]
-        x[i][1][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][1]
-        x[i][2][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][2]
+        # random_x = np.random.choice(image_size)
+        # if random_x + m_size > x.shape[-1]:
+        #     while random_x + m_size > x.shape[-1]:
+        #         random_x = np.random.choice(image_size)
+        # random_y = np.random.choice(image_size)
+        # if random_y + m_size > x.shape[-1]:
+        #     while random_y + m_size > x.shape[-1]:
+        #         random_y = np.random.choice(image_size)
 
-    mask = np.copy(x)
-    mask[mask != 0] = 1.0
-
-    return x, mask, patch.shape
-
-
-def init_patch_square(image_size, patch_size):
-    # get mask
-    image_size = image_size ** 2
-    noise_size = image_size * patch_size
-    noise_dim = int(noise_size ** (0.5))
-    patch = np.random.rand(1, 3, noise_dim, noise_dim)
-    return patch, patch.shape
-
-
-def square_transform(patch, data_shape, patch_shape, image_size):
-    # get dummy image 
-    x = np.zeros(data_shape)
-
-    # get shape
-    m_size = patch_shape[-1]
-
-    for i in range(x.shape[0]):
-
-        # random rotation
-        rot = np.random.choice(4)
-        for j in range(patch[i].shape[0]):
-            patch[i][j] = np.rot90(patch[i][j], rot)
-
-        # random location
-        random_x = np.random.choice(image_size)
-        if random_x + m_size > x.shape[-1]:
-            while random_x + m_size > x.shape[-1]:
-                random_x = np.random.choice(image_size)
-        random_y = np.random.choice(image_size)
-        if random_y + m_size > x.shape[-1]:
-            while random_y + m_size > x.shape[-1]:
-                random_y = np.random.choice(image_size)
-
-        # apply patch to dummy image  
-        x[i][0][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][0]
-        x[i][1][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][1]
-        x[i][2][random_x:random_x + patch_shape[-1], random_y:random_y + patch_shape[-1]] = patch[i][2]
+        # apply patch to dummy video
+        # x[i][0][cx:cx + patch_shape[-1], cy:cy + patch_shape[-1]] = patch[0][0]
+        # x[i][1][cx:cx + patch_shape[-1], cy:cy + patch_shape[-1]] = patch[0][1]
+        # x[i][2][cx:cx + patch_shape[-1], cy:cy + patch_shape[-1]] = patch[0][2]
+        # TODO Grayscale now, so no three channels. Need to generalize to color.
+        x[i][cx:cx + patch_shape[-1], cy:cy + patch_shape[-1]] = patch[0]
 
     mask = np.copy(x)
     mask[mask != 0] = 1.0
 
     return x, mask
+
