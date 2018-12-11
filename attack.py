@@ -40,10 +40,10 @@ parser.add_argument('--epochs', type=int, default=20, help='number of epochs to 
 # Always cuda
 
 parser.add_argument('--target', type=int, default=5, help='The target class: 859 == toaster')
-parser.add_argument('--conf_target', type=float, default=0.9,
+parser.add_argument('--conf_target', type=float, default=0.5,
                     help='Stop attack on image when target classifier reaches this value for target class')
 
-parser.add_argument('--max_count', type=int, default=300, help='max number of iterations to find adversarial example')
+parser.add_argument('--max_count', type=int, default=500, help='max number of iterations to find adversarial example')
 parser.add_argument('--patch_type', type=str, default='circle', help='patch type: circle or square')
 parser.add_argument('--patch_size', type=float, default=0.1, help='patch size. E.g. 0.05 ~= 5% of image ')
 
@@ -458,8 +458,10 @@ def attack(x, patches, masks):
     flow_y = Variable(torch.FloatTensor(flow_y).cuda())
 
     adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
-    adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
-    adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
+    # adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
+    # adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
+    adv_flow_x = flow_x
+    adv_flow_y = flow_y
 
     count = 0
     lr = 10000
@@ -473,23 +475,23 @@ def attack(x, patches, masks):
         adv_out, grad_frames, grad_flow_x, grad_flow_y = forward(adv_x, grad=True, rescue=(True, True, True))
 
         # adv_out_probs, adv_out_labels = adv_out.max(1)
-        # if count > 150:
-        #     lr = 100000
+        if count > 400:
+            lr = 10000 + ((count - 300) // 100 ) * 10000
 
         # TODO is optical flow differentiable and backpropagatable?
         # patch -= ((grad_frames + grad_flow_x + grad_flow_y) / 3)
         try:
             patch_frames -= grad_frames[0][0] * lr
-            patch_flow_x -= grad_flow_x[0][0]
-            patch_flow_y -= grad_flow_y[0][0]
+            # patch_flow_x -= grad_flow_x[0][0]
+            # patch_flow_y -= grad_flow_y[0][0]
         except Exception as e:
             patch_frames[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
-            patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0]
-            patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0]
+            # patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0]
+            # patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0]
 
         adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
-        adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
-        adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
+        # adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
+        # adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
         adv_x = (adv_frames, adv_flow_x, adv_flow_y)
         # adv_x = torch.clamp(adv_x, min_out, max_out)
         # TODO do we need clamp???
@@ -498,7 +500,7 @@ def attack(x, patches, masks):
         target_prob = x_out[target]
         y_argmax_prob = x_out.max()
 
-        print(count, conf_target, target_prob, y_argmax_prob)
+        # print(count, conf_target, target_prob, y_argmax_prob)
 
         if count >= opt.max_count:
             break
