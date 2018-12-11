@@ -466,6 +466,8 @@ def attack(x, patches, masks):
     count = 0
     lr = 10000
 
+    adv_x = (adv_frames, adv_flow_x, adv_flow_y)
+
     while conf_target > target_prob:
         count += 1
         # adv_frames = Variable(adv_frames.data, requires_grad=True)
