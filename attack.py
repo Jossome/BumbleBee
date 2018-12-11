@@ -480,12 +480,12 @@ def attack(x, patches, masks):
         # patch -= ((grad_frames + grad_flow_x + grad_flow_y) / 3)
         try:
             patch_frames -= grad_frames[0][0] * lr
-            patch_flow_x -= grad_flow_x[0][0] * lr
-            patch_flow_y -= grad_flow_y[0][0] * lr
+            patch_flow_x -= grad_flow_x[0][0]
+            patch_flow_y -= grad_flow_y[0][0]
         except Exception as e:
             patch_frames[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
-            patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0] * lr
-            patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0] * lr
+            patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0]
+            patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0]
 
         adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
         adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
