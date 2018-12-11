@@ -142,7 +142,7 @@ def init_patch_circle(frame_height, frame_width, patch_size):
     #     a = np.delete(a, idx, axis=0)
     #     patch[0][i] = np.delete(a, idx, axis=1)
 
-    patch = np.zeros((1, radius * 2, radius * 2))
+    patch = np.zeros((180, radius * 2, radius * 2))
     a = np.zeros((radius * 2, radius * 2))
     cx, cy = radius, radius  # The center of circle
     y, x = np.ogrid[-radius: radius, -radius: radius]
@@ -150,7 +150,9 @@ def init_patch_circle(frame_height, frame_width, patch_size):
     a[cy - radius:cy + radius, cx - radius:cx + radius][index] = np.random.rand()
     idx = np.flatnonzero((a == 0).all((1)))
     a = np.delete(a, idx, axis=0)
-    patch[0] = np.delete(a, idx, axis=1)
+    for i in range(180):
+        patch[i] = np.delete(a, idx, axis=1)
+
     return patch
 
 

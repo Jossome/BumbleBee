@@ -45,7 +45,7 @@ parser.add_argument('--conf_target', type=float, default=0.9,
 
 parser.add_argument('--max_count', type=int, default=300, help='max number of iterations to find adversarial example')
 parser.add_argument('--patch_type', type=str, default='circle', help='patch type: circle or square')
-parser.add_argument('--patch_size', type=float, default=0.05, help='patch size. E.g. 0.05 ~= 5% of image ')
+parser.add_argument('--patch_size', type=float, default=0.1, help='patch size. E.g. 0.05 ~= 5% of image ')
 
 parser.add_argument('--train_size', type=int, default=2000, help='Number of training images')
 parser.add_argument('--test_size', type=int, default=2000, help='Number of test images')
@@ -154,12 +154,18 @@ def forward(x, grad=False, rescue=(False, False, False)):
     frames, flow_x, flow_y = x
     if rescue[0]:
         frames = frames.cpu().numpy()
+
     if rescue[1]:
         flow_x = flow_x.cpu().numpy()
+        flow_x = np.concatenate((np.zeros((1, 30, 40)), flow_x), axis=0)
+    else:
+        flow_x = [0] + flow_x
+
     if rescue[2]:
         flow_y = flow_y.cpu().numpy()
-    flow_x = [0] + flow_x
-    flow_y = [0] + flow_y
+        flow_y = np.concatenate((np.zeros((1, 30, 40)), flow_y), axis=0)
+    else:
+        flow_y = [0] + flow_y
 
     # Class probabilities.
     prob = np.zeros(6, dtype=np.float32)
@@ -345,8 +351,10 @@ def process_input(video, patch=None, mask=None):
     return frames, flow_x, flow_y
 
 
-def train(patch):
-    patch_shape = patch.shape
+def train(patch_frames, patch_flow_x, patch_flow_y):
+    patch_frames_shape = patch_frames.shape
+    patch_flow_x_shape = patch_flow_x.shape
+    patch_flow_y_shape = patch_flow_y.shape
     net.eval()
     success = 0
     total = 0
@@ -373,14 +381,26 @@ def train(patch):
 
         # TODO: currently fixed patch. Dynamic patch needs one more dimension.
         # Need to change to a higher dimensional matrix instead of using list.
-        patch, mask = circle_transform(patch, np.shape(frames))
-        patch = Variable(torch.FloatTensor(patch).cuda())
-        mask = Variable(torch.FloatTensor(mask).cuda())
+        patch_frames, mask_frames = circle_transform(patch_frames, np.shape(frames))
+        patch_flow_x, mask_flow_x = circle_transform(patch_flow_x, np.shape(flow_x))
+        patch_flow_y, mask_flow_y = circle_transform(patch_flow_y, np.shape(flow_y))
+        patch_frames = Variable(torch.FloatTensor(patch_frames).cuda())
+        patch_flow_x = Variable(torch.FloatTensor(patch_flow_x).cuda())
+        patch_flow_y = Variable(torch.FloatTensor(patch_flow_y).cuda())
+        mask_frames = Variable(torch.FloatTensor(mask_frames).cuda())
+        mask_flow_x = Variable(torch.FloatTensor(mask_flow_x).cuda())
+        mask_flow_y = Variable(torch.FloatTensor(mask_flow_y).cuda())
         # Note that after the transform, patch size changes to the entire video shape
 
-        adv_x, mask, patch = attack(x, patch, mask)
+        patches = (patch_frames, patch_flow_x, patch_flow_y)
+        masks = (mask_frames, mask_flow_x, mask_flow_y)
 
-        adv_prob = forward(adv_x, rescue=(True, False, False))
+        adv_x, patches, masks = attack(x, patches, masks)
+
+        patch_frames, patch_flow_x, patch_flow_y = patches
+        mask_frames, mask_flow_x, mask_flow_y = masks
+
+        adv_prob = forward(adv_x, rescue=(True, True, True))
         adv_label = np.argmax(adv_prob.detach().cpu().numpy())
         # ori_label = labels
 
@@ -396,80 +416,50 @@ def train(patch):
             #     vutils.save_image(adv_x.data, "./%s/%d_%d_adversarial.png" % (opt.outf, batch_idx, adv_label),
             #                       normalize=True)
 
-        masked_patch = torch.mul(mask, patch)
-        patch = masked_patch.data.cpu().numpy()
-        new_patch = np.zeros(patch_shape)
-        for i in range(new_patch.shape[0]):
+        masked_patch_frames = torch.mul(mask_frames, patch_frames)
+        masked_patch_flow_x = torch.mul(mask_flow_x, patch_flow_x)
+        masked_patch_flow_y = torch.mul(mask_flow_y, patch_flow_y)
+        patch_frames = masked_patch_frames.data.cpu().numpy()
+        patch_flow_x = masked_patch_flow_x.data.cpu().numpy()
+        patch_flow_y = masked_patch_flow_y.data.cpu().numpy()
+        new_patch_frames = np.zeros(patch_frames_shape)
+        new_patch_flow_x = np.zeros(patch_flow_x_shape)
+        new_patch_flow_y = np.zeros(patch_flow_y_shape)
+        for i in range(new_patch_frames.shape[0]):
             # for j in range(new_patch.shape[1]):
                 # new_patch[i][j] = submatrix(patch[i][j])
-            new_patch[i] = submatrix(patch[i])
+            new_patch_frames[i] = submatrix(patch_frames[i])
+        for i in range(new_patch_flow_x.shape[0]):
+            new_patch_flow_x[i] = submatrix(patch_flow_x[i])
+        for i in range(new_patch_flow_y.shape[0]):
+            new_patch_flow_y[i] = submatrix(patch_flow_y[i])
 
-        patch = new_patch
-        print(patch.shape)
+        patch_frames = new_patch_frames
+        patch_flow_x = new_patch_flow_x
+        patch_flow_y = new_patch_flow_y
 
         # log to file
         progress_bar(batch_idx, 192, "Train Patch Success: {:.3f}".format(success / total))
 
-    return patch
+    return patch_frames, patch_flow_x, patch_flow_y
 
 
-def test(patch, patch_shape):
-    net.eval()
-    success = 0
-    total = 0
-    for batch_idx, (data, labels) in enumerate(test_loader):
-        if opt.cuda:
-            data = data.cuda()
-            labels = labels.cuda()
-        data, labels = Variable(data), Variable(labels)
-
-        prediction = net(data)
-
-        # only computer adversarial examples on examples that are originally classified correctly
-        if prediction.data.max(1)[1][0] != labels.data[0]:
-            continue
-
-        total += 1
-
-        # transform path
-        data_shape = data.data.cpu().numpy().shape
-        patch, mask, patch_shape = circle_transform(patch, data_shape, patch_shape, frame_height, frame_width, time_step)
-        patch, mask = torch.FloatTensor(patch), torch.FloatTensor(mask)
-        if opt.cuda:
-            patch, mask = patch.cuda(), mask.cuda()
-        patch, mask = Variable(patch), Variable(mask)
-
-        adv_x = torch.mul((1 - mask), data) + torch.mul(mask, patch)
-        # adv_x = torch.clamp(adv_x, min_out, max_out)
-
-        adv_label = net(adv_x).data.max(1)[1][0]
-        ori_label = labels.data[0]
-
-        if adv_label == target:
-            success += 1
-
-        masked_patch = torch.mul(mask, patch)
-        patch = masked_patch.data.cpu().numpy()
-        new_patch = np.zeros(patch_shape)
-        for i in range(new_patch.shape[0]):
-            for j in range(new_patch.shape[1]):
-                new_patch[i][j] = submatrix(patch[i][j])
-
-        patch = new_patch
-
-        # log to file
-        progress_bar(batch_idx, len(test_loader), "Test Success: {:.3f}".format(success / total))
-
-
-def attack(x, patch, mask):
+def attack(x, patches, masks):
     net.eval()
 
-    frames, _, _ = x
+    frames, flow_x, flow_y = x
+    patch_frames, patch_flow_x, patch_flow_y = patches
+    mask_frames, mask_flow_x, mask_flow_y = masks
+
     x_out = forward(x)
     target_prob = x_out[target]
     frames = Variable(torch.FloatTensor(frames).cuda())
+    flow_x = Variable(torch.FloatTensor(flow_x).cuda())
+    flow_y = Variable(torch.FloatTensor(flow_y).cuda())
 
-    adv_frames, adv_flow_x, adv_flow_y = process_input(frames, patch=patch, mask=mask)
+    adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
+    adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
+    adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
 
     count = 0
     lr = 10000
@@ -480,7 +470,7 @@ def attack(x, patch, mask):
         # adv_flow_x = Variable(torch.FloatTensor(adv_flow_x).cuda(), requires_grad=True)
         # adv_flow_y = Variable(torch.FloatTensor(adv_flow_y).cuda(), requires_grad=True)
         adv_x = (adv_frames, adv_flow_x, adv_flow_y)
-        adv_out, grad_frames, grad_flow_x, grad_flow_y = forward(adv_x, grad=True, rescue=(True, False, False))
+        adv_out, grad_frames, grad_flow_x, grad_flow_y = forward(adv_x, grad=True, rescue=(True, True, True))
 
         # adv_out_probs, adv_out_labels = adv_out.max(1)
         # if count > 150:
@@ -489,16 +479,22 @@ def attack(x, patch, mask):
         # TODO is optical flow differentiable and backpropagatable?
         # patch -= ((grad_frames + grad_flow_x + grad_flow_y) / 3)
         try:
-            patch -= grad_frames[0][0] * lr
+            patch_frames -= grad_frames[0][0] * lr
+            patch_flow_x -= grad_flow_x[0][0] * lr
+            patch_flow_y -= grad_flow_y[0][0] * lr
         except Exception as e:
-            patch[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
+            patch_frames[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
+            patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0] * lr
+            patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0] * lr
 
-        adv_frames, adv_flow_x, adv_flow_y = process_input(frames, patch=patch, mask=mask)
+        adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
+        adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
+        adv_flow_y = torch.mul((1 - mask_flow_y), flow_y) + torch.mul(mask_flow_y, patch_flow_y)
         adv_x = (adv_frames, adv_flow_x, adv_flow_y)
         # adv_x = torch.clamp(adv_x, min_out, max_out)
         # TODO do we need clamp???
 
-        x_out = forward(adv_x, rescue=(True, False, False))
+        x_out = forward(adv_x, rescue=(True, True, True))
         target_prob = x_out[target]
         y_argmax_prob = x_out.max()
 
@@ -507,12 +503,16 @@ def attack(x, patch, mask):
         if count >= opt.max_count:
             break
 
-    return adv_x, mask, patch
+    return adv_x, (patch_frames, patch_flow_x, patch_flow_y), (mask_frames, mask_flow_x, mask_flow_y)
 
 
 if __name__ == '__main__':
-    patch = init_patch_circle(frame_height, frame_width, patch_size)
+    patch_frames = init_patch_circle(frame_height, frame_width, patch_size)
+    patch_flow_x = init_patch_circle(frame_height / 2, frame_width / 2, patch_size / 4)
+    patch_flow_y = init_patch_circle(frame_height / 2, frame_width / 2, patch_size / 4)
+    # Currently modified till here. dim=0 for patch is the video length.
+    # Unified the video length to 180 fixed.
 
     for epoch in range(1, opt.epochs + 1):
-        patch = train(patch)
+        patch = train(patch_frames, patch_flow_x, patch_flow_y)
         # test(patch)
