@@ -122,9 +122,7 @@ def generate_data_loader(split='train'):
             yield (imageio.get_reader(filepath, "ffmpeg"), i)
 
 
-print('==> Preparing data..')
-train_loader = generate_data_loader(split='train')
-test_loader = generate_data_loader(split='test')
+# test_loader = generate_data_loader(split='test')
 
 
 # normalize = transforms.Normalize(mean=net.mean, std=net.std)
@@ -351,7 +349,7 @@ def process_input(video, patch=None, mask=None):
     return frames, flow_x, flow_y
 
 
-def train(patch_frames, patch_flow_x, patch_flow_y):
+def train(epoch, patch_frames, patch_flow_x, patch_flow_y):
     patch_frames_shape = patch_frames.shape
     patch_flow_x_shape = patch_flow_x.shape
     patch_flow_y_shape = patch_flow_y.shape
@@ -359,6 +357,9 @@ def train(patch_frames, patch_flow_x, patch_flow_y):
     success = 0
     total = 0
     recover_time = 0
+    caonima = 0
+    print('==> Preparing data..')
+    train_loader = generate_data_loader(split='train')
 
     # labels: int index of the list, not str!!!
     for batch_idx, (video, labels) in enumerate(train_loader):
@@ -437,11 +438,12 @@ def train(patch_frames, patch_flow_x, patch_flow_y):
         patch_frames = new_patch_frames
         patch_flow_x = new_patch_flow_x
         patch_flow_y = new_patch_flow_y
+        caonima = success / total
 
         # log to file
         progress_bar(batch_idx, 192, "Train Patch Success: {:.3f}".format(success / total))
 
-    return patch_frames, patch_flow_x, patch_flow_y
+    return patch_frames, patch_flow_x, patch_flow_y, caonima
 
 
 def attack(x, patches, masks):
@@ -518,5 +520,6 @@ if __name__ == '__main__':
     # Unified the video length to 180 fixed.
 
     for epoch in range(1, opt.epochs + 1):
-        patch = train(patch_frames, patch_flow_x, patch_flow_y)
+        patch_frames, patch_flow_x, patch_flow_y, rate = train(epoch, patch_frames, patch_flow_x, patch_flow_y)
+        print(epoch, rate)
         # test(patch)
