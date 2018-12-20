@@ -483,15 +483,14 @@ def attack(x, patches, masks):
             lr = 10000 + ((count - 300) // 100 ) * 10000
 
         # TODO is optical flow differentiable and backpropagatable?
-        # patch -= ((grad_frames + grad_flow_x + grad_flow_y) / 3)
         try:
             patch_frames -= grad_frames[0][0] * lr
-            # patch_flow_x -= grad_flow_x[0][0]
-            # patch_flow_y -= grad_flow_y[0][0]
+            # patch_flow_x -= grad_flow_x[0][0] * lr
+            # patch_flow_y -= grad_flow_y[0][0] * lr
         except Exception as e:
             patch_frames[:grad_frames[0][0].shape[0], :, :] -= grad_frames[0][0] * lr
-            # patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0]
-            # patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0]
+            # patch_flow_x[:grad_flow_x[0][0].shape[0], :, :] -= grad_flow_x[0][0] * lr
+            # patch_flow_y[:grad_flow_y[0][0].shape[0], :, :] -= grad_flow_y[0][0] * lr
 
         adv_frames = torch.mul((1 - mask_frames), frames) + torch.mul(mask_frames, patch_frames)
         # adv_flow_x = torch.mul((1 - mask_flow_x), flow_x) + torch.mul(mask_flow_x, patch_flow_x)
@@ -518,8 +517,12 @@ if __name__ == '__main__':
     patch_flow_y = init_patch_circle(frame_height / 2, frame_width / 2, patch_size / 4)
     # Currently modified till here. dim=0 for patch is the video length.
     # Unified the video length to 180 fixed.
+    img = None
 
     for epoch in range(1, opt.epochs + 1):
         patch_frames, patch_flow_x, patch_flow_y, rate = train(epoch, patch_frames, patch_flow_x, patch_flow_y)
+        img = Image.fromarray(patch_frames[0]).convert('L')
+        img.save('patch.bmp')
         print(epoch, rate)
+        break
         # test(patch)
